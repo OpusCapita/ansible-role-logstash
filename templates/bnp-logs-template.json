@@ -1,0 +1,91 @@
+{
+  "index_patterns": [
+    "bnp_logs-*"
+  ],
+  "settings": {
+    "number_of_shards": 3,
+    "number_of_replicas" : 1
+  },
+  "mappings": {
+    "properties": {
+      "request": {
+        "properties": {
+          "cookie": {
+            "type": "text"
+          },
+          "requestMethod": {
+            "type": "keyword"
+          },
+          "requestUri": {
+            "type": "text"
+          },
+          "queryString": {
+            "type": "text"
+          },
+          "requestPath": {
+            "type": "text"
+          }
+        }
+      },
+      "hostIdentity": {
+        "properties": {
+          "clientIp": {
+            "type": "ip"
+          },
+          "userAgent": {
+            "type": "text"
+          }
+        }
+      },
+      "response": {
+        "properties": {
+          "status": {
+            "type": "short"
+          }
+        }
+      },
+      "dataType": {
+        "type": "keyword"
+      },
+      "latency": {
+        "properties": {
+          "request": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "service": {
+            "type": "integer"
+          },
+          "kong": {
+            "type": "integer"
+          }
+        }
+      },
+      "host": {
+        "type": "keyword"
+      },
+      "serviceInstanceId": {
+        "type": "keyword"
+      },
+      "correlationId": {
+        "type": "keyword"
+      },
+      "message": {
+        "type": "text"
+      },
+      "serviceName": {
+        "type": "keyword"
+      },
+      "type": {
+        "type": "keyword"
+      },
+      "userId": {
+        "type": "keyword"
+      }
+    }
+  },
+  "aliases": {}
+}
+

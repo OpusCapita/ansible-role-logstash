@@ -1,0 +1,176 @@
+filter {
+    if [type] == "service" {
+        json {
+            source => "message"
+            target => "custommessage"
+        }
+        if (![custommessage][event][transactionId]){
+            if "_jsonparsefailure" in [tags] {
+                mutate {
+                    remove_tag => ["_jsonparsefailure"]
+                    remove_field => ["custommessage"]
+                    add_field => {"dataType" => "string"}
+                }
+            } else if [custommessage][api][upstream_url] { #gateway file logs
+                mutate {
+                    replace => { "type" => "gateway" }
+                }
+                if ([custommessage][request][headers][x-user-id]) {
+                    mutate {
+                        add_field => {
+                            "userId" => "%{[custommessage][request][headers][x-user-id]}"
+                        }
+                    }
+                }
+                if ([custommessage][request][headers][x-user-roles]) {
+                    mutate {
+                        add_field => {
+                            "userRoles" => "%{[custommessage][request][headers][x-user-roles]}"
+                        }
+                    }
+                }
+                if ([custommessage][latencies]) {
+                    mutate {
+                        add_field => {
+                            "[latency][request]" => "%{[custommessage][latencies][request]}"
+                        }
+                        add_field => {
+                            "[latency][kong]" => "%{[custommessage][latencies][kong]}"
+                        }
+                        add_field => {
+                            "[latency][service]" => "%{[custommessage][latencies][proxy]}"
+                        }
+                    }
+                } else {
+                    mutate {
+                        add_field => {
+                            "[latency][request]" => 0
+                        }
+                        add_field => {
+                            "[latency][kong]" => 0
+                        }
+                        add_field => {
+                            "[latency][service]" => 0
+                        }
+                    }
+                }
+                mutate {
+                    #identity
+                    add_field => { "[correlationId]" => "%{[custommessage][request][headers][correlation-id]}" }
+
+                    # host identity
+                    add_field => { "[hostIdentity][clientIp]" => "%{[custommessage][client_ip]}" }
+                    add_field => { "[hostIdentity][userAgent]" => "%{[custommessage][request][headers][user-agent]}" }
+
+                    #request
+                    add_field => { "[requestdata][kong][upstreamURL]" => "%{[custommessage][api][upstream_url]}" }
+                    add_field => { "[requestdata][kong][uris]" => "%{[custommessage][api][uris]}" }
+                    add_field => { "[requestdata][requestMethod]" => "%{[custommessage][request][method]}" }
+                    add_field => { "[requestdata][requestUri]" => "%{[custommessage][request][request_uri]}" }
+                    add_field => { "[requestdata][queryString]" => "%{[custommessage][request][querystring]}" }
+                    add_field => { "[requestdata][cookie]" => "%{[custommessage][request][headers][cookie]}" }
+                    add_field => { "[requestdata][started_at]" => "%{[custommessage][started_at]}" }
+
+                    #response
+                    add_field => { "[responsedata][status]" => "%{[custommessage][response][status]}" }
+
+
+                }
+                mutate {
+                    convert => {"[responsedata][status]" => "integer"}
+                    convert => {"[latency][request]" => "integer"}
+                    convert => {"[latency][service]" => "integer"}
+                    convert => {"[latency][kong]" => "integer"}
+                    convert => {"[requestdata][started_at]" => "integer"}
+                }
+                prune {
+                    #whitelist only these items
+                    whitelist_names => ["responsedata", "requestdata", "correlationId", "@timestamp", "host", "hostIdentity", "level", "image_name", "userId", "userRoles", "latency", "tag"]
+                }
+                ruby {
+                  code => "event.set('[latency][total]', event.get('[latency][request]') + event.get('[latency][kong]') + event.get('[latency][service]'))"
+                    # code => "event.cancel if rand <= 0.90"
+                }
+                mutate {
+                    #rename them back to the original object name
+                    rename => { "requestdata" => "request" }
+                    rename => { "responsedata" => "response" }
+                    add_field => {"dataType" => "json"}
+                    #message
+                    add_field => { "[message]" => "%{[request][requestUri]} - %{[response][status]}, %{[latency][total]}" }
+                }
+            } else {
+                mutate {
+                    remove_field => ["message"]
+                }
+                if [custommessage][userId] {
+                    mutate {
+                        add_field => {"userId" => "%{[custommessage][userId]}"}
+                    }
+                }
+                if [custommessage][correlationId] {
+                    mutate {
+                        add_field => {"correlationId" => "%{[custommessage][correlationId]}"}
+                    }
+                }
+                if [custommessage][method] {
+                   mutate {
+                     add_field => {"[requestdata][requestMethod]" => "%{[custommessage][method]}"}
+                   }
+                }
+                if [custommessage][requestUri] {
+                   mutate {
+                    add_field => {"[requestdata][requestUri]" => "%{[custommessage][requestUri]}"}
+                  }
+                }
+                if [custommessage][serviceName] {
+                    mutate {
+                        add_field => {"serviceName" => "%{[custommessage][serviceName]}"}
+                    }
+                }
+                if [custommessage][serviceInstanceId] {
+                    mutate {
+                        add_field => {"serviceInstanceId" => "%{[custommessage][serviceInstanceId]}"}
+                    }
+                }
+                if [custommessage][message] {
+                    mutate {
+                        add_field => {"message" => "%{[custommessage][message]}"}
+                    }
+                }
+                mutate {
+                    add_field => {"dataType" => "json"}
+                    rename => { "requestdata" => "request" }
+                    remove_field => ["custommessage"]
+                }
+            }
+
+            #log level to string for better process, since logging is using string instead of number
+            if [level] == 3 or [level] == 200 {
+                mutate {
+                    replace => {"level" => "error"}
+                }
+            } else if [level] == 4 or [level] == 300 {
+                mutate {
+                    replace => {"level" => "warning"}
+                }
+            } else if [level] == 400 {
+                mutate {
+                    replace => {"level" => "info"}
+                }
+            } else if [level] == 500 {
+                mutate {
+                    replace => {"level" => "debug"}
+                }
+            } else if [level] == 600 {
+                mutate {
+                    replace => {"level" => "trace"}
+                }
+            } else {
+                mutate {
+                    replace => {"level" => "info"}
+                }
+            }
+        }
+    }
+}

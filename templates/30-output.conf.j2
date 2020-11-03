@@ -1,0 +1,23 @@
+output {
+  elasticsearch {
+    hosts => {{ logstash_elasticsearch_hosts | to_json }}
+    index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+  }
+}
+output {
+    if ![event][transactionId]{
+		elasticsearch {
+			hosts => {{ logstash_elasticsearch_hosts | to_json }}
+			template => "/etc/logstash/bnp-logs-template.json"
+			template_overwrite => true
+			template_name => "bnp_logs"
+			index => "bnp_logs-%{+YYYY.MM.dd}"
+		}
+		if [type] == "service" {
+         file {
+           path => /data/services/${tag}/%{tag}-%{+YYYY.MM.dd}.log
+           codec => line { format => "[${@timestamp}] %{message}"}
+         }
+        }
+    }
+}
