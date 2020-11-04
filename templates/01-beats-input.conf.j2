@@ -1,6 +1,7 @@
 input {
   beats {
     port => {{ logstash_listen_port_beats }}
+    client_inactivity_timeout => 3600
 {% if logstash_ssl_certificate_file and logstash_ssl_key_file %}
     ssl => true
     ssl_certificate => "{{ logstash_ssl_dir }}/{{ logstash_ssl_certificate_file | basename }}"
