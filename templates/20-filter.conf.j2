@@ -1,0 +1,20 @@
+filter {
+    if [container][labels][com_docker_swarm_service_name] {
+        mutate {
+            copy => { "[container][labels][com_docker_swarm_service_name]" => "tag" }
+        }
+        # Remove unused fields
+        ruby {
+            code => "
+                hash = event.get('[container][labels]')
+                hash.keys.each do |field|
+                  # logger.info('field is:', field)
+                  if field.start_with?('org_label-')
+                    # must build full path to field
+                    event.remove('[container][labels][' + field + ']')
+                  end
+                end
+            "
+        }
+    }
+}

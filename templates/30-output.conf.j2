@@ -1,34 +1,22 @@
 output {
-	if [@metadata][beat] {
-		elasticsearch {
-			hosts => {{ logstash_elasticsearch_hosts | to_json }}
-			index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
-		}
-	}
-}
-output {
-	if [type] == "service" and ! [event][transactionId] {
-		elasticsearch {
-			hosts => {{ logstash_elasticsearch_hosts | to_json }}
-			template => "/etc/logstash/bnp-logs-template.json"
-			template_overwrite => true
-			template_name => "bnp_logs"
-			index => "bnp_logs-%{+YYYY.MM.dd}"
-		}
-		file {
-			path => "/data/logs/%{+YYYY.MM.dd}/services/%{tag}.log"
-			codec => line { format => "[%{@timestamp}] %{container_name}: %{message}" }
-		}
-	}
-}
 
-#output {
-# file {
-#   path => "/data/logs/debug.log"
-# }
-#}
-output {
-	if [input][type] == "container" {
+    if [message][event][transactionId] {
+        # TNT
+        gelf {
+            host => "udp://logstash:12201"
+        }
+    } else if [container][labels][com_docker_swarm_service_name] {
+        # Service
+        elasticsearch {
+            hosts => {{ logstash_elasticsearch_hosts | to_json }}
+            index => "services-%{+YYYY.MM.dd}"
+        }
+		file {
+			path => "/data/logs/%{+YYYY.MM.dd}/services/%{[container][labels][com_docker_swarm_service_name]}.log"
+			codec => line { format => "[%{@timestamp}] %{[container][name]}@%{[host][name]}: %{message}" }
+		}
+    } else if [container] {
+        # Container
 		elasticsearch {
 			hosts => {{ logstash_elasticsearch_hosts | to_json }}
 			index => "container-%{+YYYY.MM.dd}"
@@ -37,18 +25,22 @@ output {
 			path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}/%{[host][name]}.log"
 			codec => line { format => "%{message}"}
 		}
-	}
-}
-output {
+	} else if [@metadata][beat] {
+	    # System logs
+		elasticsearch {
+			hosts => {{ logstash_elasticsearch_hosts | to_json }}
+			index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+		}
+    }
+
 	if [input][type] == "log" {
+	    # Log files
 		file {
 			path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[log_file]}"
 			codec => line { format => "%{message}"}
 		}
-	}
-}
-output {
-	if [agent][type] == "journalbeat" {
+	} else if [agent][type] == "journalbeat" {
+	    # Journald
 		if [systemd][session] and ! [systemd][unit] {
 			file {
 				path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/messages.log"

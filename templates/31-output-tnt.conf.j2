@@ -1,7 +1,0 @@
-output {
-    if [event][transactionId]{
-        gelf {
-            host => "udp://logstash:12201"
-        }
-    }
-}

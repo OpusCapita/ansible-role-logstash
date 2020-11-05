@@ -9,18 +9,17 @@
   with_items:
     - 01-beats-input.conf
     - 03-gelf-input.conf
-    - 10-bnp-filter.conf
+    - 20-filter.conf
     - 30-output.conf
-    - 31-output-tnt.conf
   notify: restart logstash
 
-- name: Create Logstash filters.
-  template:
-    src: "{{ item }}"
-    dest: "/etc/logstash/{{ item }}"
-    owner: root
-    group: root
-    mode: 0644
-  with_items:
-    - bnp-logs-template.json
-  notify: restart logstash
+#- name: Create elasticsearch template.
+#  template:
+#    src: "{{ item }}"
+#    dest: "/etc/logstash/{{ item }}"
+#    owner: root
+#    group: root
+#    mode: 0644
+#  with_items:
+#    - bnp-logs-template.json
+#  notify: restart logstash
