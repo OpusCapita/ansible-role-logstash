@@ -6,6 +6,15 @@
 - include: ssl.yml
 - include: plugins.yml
 
+- name: Output directory
+  file:
+    state: directory
+    path: "{{ logstash_output_dir }}"
+    owner: logstash
+    group: logstash
+    mode: 0775
+  when: logstash_output_dir is defined
+
 - name: Ensure Logstash is started and enabled on boot.
   service:
     name: logstash

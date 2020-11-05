@@ -10,7 +10,6 @@
     - 01-beats-input.conf
     - 03-gelf-input.conf
     - 10-bnp-filter.conf
-    - 11-syslog-filter.conf
     - 30-output.conf
     - 31-output-tnt.conf
   notify: restart logstash

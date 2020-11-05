@@ -1,54 +1,79 @@
-#output {
-#    elasticsearch {
-#      hosts => {{ logstash_elasticsearch_hosts | to_json }}
-#      index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
-#    }
-#    if ![event][transactionId]{
-#		elasticsearch {
-#			hosts => {{ logstash_elasticsearch_hosts | to_json }}
-#			template => "/etc/logstash/bnp-logs-template.json"
-#			template_overwrite => true
-#    		template_name => "bnp_logs"
-#			index => "bnp_logs-%{+YYYY.MM.dd}"
-#		}
-#		if [type] == "service" {
-#         file {
-#           path => /data/services/%{tag}/%{tag}-%{+YYYY.MM.dd}.log
-#           codec => line { format => "[%{@timestamp}] %{message}"}
-#         }
-#        }
-#    }
-#    file {
-#        path => /data/debug-%{+YYYY.MM.dd}.log
-#    }
-#}
+output {
+	if [@metadata][beat] {
+		elasticsearch {
+			hosts => {{ logstash_elasticsearch_hosts | to_json }}
+			index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+		}
+	}
+}
+output {
+	if [type] == "service" and ! [event][transactionId] {
+		elasticsearch {
+			hosts => {{ logstash_elasticsearch_hosts | to_json }}
+			template => "/etc/logstash/bnp-logs-template.json"
+			template_overwrite => true
+			template_name => "bnp_logs"
+			index => "bnp_logs-%{+YYYY.MM.dd}"
+		}
+		file {
+			path => "/data/logs/%{+YYYY.MM.dd}/services/%{tag}.log"
+			codec => line { format => "[%{@timestamp}] %{container_name}: %{message}" }
+		}
+	}
+}
 
+#output {
+# file {
+#   path => "/data/logs/debug.log"
+# }
+#}
 output {
- file {
-   path => "/data/debug.log"
- }
+	if [input][type] == "container" {
+		elasticsearch {
+			hosts => {{ logstash_elasticsearch_hosts | to_json }}
+			index => "container-%{+YYYY.MM.dd}"
+		}
+		file {
+			path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}/%{[host][name]}.log"
+			codec => line { format => "%{message}"}
+		}
+	}
 }
 output {
-    if [input][type] == "container" {
-        file {
-            path => "/data/nodes/%{[host][name]}/docker/%{[container][name]}-%{+YYYY.MM.dd}.log"
-            codec => line { format => "%{message}"}
-        }
-    }
+	if [input][type] == "log" {
+		file {
+			path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[log_file]}"
+			codec => line { format => "%{message}"}
+		}
+	}
 }
 output {
-    if [input][type] == "log" {
-        file {
-            path => "/data/nodes/%{[host][name]}/%{[log_file]}-%{+YYYY.MM.dd}.log"
-            codec => line { format => "%{message}"}
-        }
-    }
-}
-output {
-    if [agent][type] == "journalbeat" {
-        file {
-            path => "/data/nodes/%{[host][name]}/journald/%{[syslog][identifier]}-%{+YYYY.MM.dd}.log"
-            codec => line { format => "[%{@timestamp}] %{message}"}
-        }
-    }
+	if [agent][type] == "journalbeat" {
+		if [systemd][session] and ! [systemd][unit] {
+			file {
+				path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/messages.log"
+				codec => line { format => "[%{@timestamp}] %{[syslog][identifier]}: %{message}"}
+			}
+		} else if ! [syslog][identifier] and ! [systemd][unit] {
+			file {
+				path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/messages.log"
+				codec => line { format => "[%{@timestamp}] %{message}"}
+			}
+		} else if ! [systemd][unit] and [syslog][identifier] {
+		   file {
+			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[syslog][identifier]}.syslog.log"
+			   codec => line { format => "[%{@timestamp}] %{message}"}
+		   }
+	   } else if [systemd][unit] =~ /^session-\d+.scope/ {
+		   file {
+			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/session.x.scope.log"
+			   codec => line { format => "[%{@timestamp}] %{message}"}
+		   }
+	   } else {
+		   file {
+			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[systemd][unit]}.log"
+			   codec => line { format => "[%{@timestamp}] %{[syslog][identifier]}: %{message}"}
+		   }
+	   }
+	}
 }
