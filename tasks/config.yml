@@ -23,3 +23,12 @@
 #  with_items:
 #    - bnp-logs-template.json
 #  notify: restart logstash
+
+- name: Logger levels
+  lineinfile:
+    line: "{{ item.key }} = {{ item.value }}"
+    path: '/etc/logstash/log4j2.properties'
+    regexp: '^{{ item.key }}'
+    insertbefore: EOF
+  with_dict: "{{ logstash_log4j2_properties }}"
+  notify: restart logstash

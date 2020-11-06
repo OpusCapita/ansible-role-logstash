@@ -13,17 +13,19 @@ output {
         }
 		file {
 			path => "/data/logs/%{+YYYY.MM.dd}/services/%{[container][labels][com_docker_swarm_service_name]}.log"
-			codec => line { format => "[%{@timestamp}] %{[container][name]}@%{[host][name]}: %{message}" }
+			codec => line { format => "[%{@timestamp}] %{[container][name]} @%{[host][name]}: %{message}" }
 		}
     } else if [container] {
-        # Container
-		elasticsearch {
-			hosts => {{ logstash_elasticsearch_hosts | to_json }}
-			index => "container-%{+YYYY.MM.dd}"
-		}
-		file {
-			path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}/%{[host][name]}.log"
-			codec => line { format => "%{message}"}
+        if [container][name] {
+            # Container which still exists
+            elasticsearch {
+                hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                index => "container-%{+YYYY.MM.dd}"
+            }
+            file {
+                path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}/%{[host][name]}.log"
+                codec => line { format => "%{message}"}
+            }
 		}
 	} else if [@metadata][beat] {
 	    # System logs
@@ -59,7 +61,12 @@ output {
 	   } else if [systemd][unit] =~ /^session-\d+.scope/ {
 		   file {
 			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/session.x.scope.log"
-			   codec => line { format => "[%{@timestamp}] %{message}"}
+			   codec => line { format => "[%{@timestamp}] %{[systemd][unit]}: %{message}"}
+		   }
+	   } else if [systemd][unit] =~ /^user.\d+.service/ {
+		   file {
+			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/user@x.service.log"
+			   codec => line { format => "[%{@timestamp}] %{[systemd][unit]}: %{message}"}
 		   }
 	   } else {
 		   file {
