@@ -16,6 +16,7 @@ output {
 			codec => line { format => "[%{@timestamp}] %{[container][name]} @%{[host][name]}: %{message}" }
 		}
     } else if [container] {
+        # docker container
         if [container][name] {
             # Container which still exists
             elasticsearch {
@@ -29,6 +30,7 @@ output {
 		}
 	} else if [@metadata][beat] {
 	    # System logs
+	    # the value of [@metadata][beat] is journalbeat or filebeat
 		elasticsearch {
 			hosts => {{ logstash_elasticsearch_hosts | to_json }}
 			index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
@@ -44,35 +46,41 @@ output {
 	} else if [agent][type] == "journalbeat" {
 	    # Journald
 		if [systemd][session] and ! [systemd][unit] {
+		    # cannot determine the exact source of the message
 			file {
 				path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/messages.log"
 				codec => line { format => "[%{@timestamp}] %{[syslog][identifier]}: %{message}"}
 			}
 		} else if ! [syslog][identifier] and ! [systemd][unit] {
+		    # cannot determine the exact source of the message
 			file {
 				path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/messages.log"
 				codec => line { format => "[%{@timestamp}] %{message}"}
 			}
 		} else if ! [systemd][unit] and [syslog][identifier] {
-		   file {
-			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[syslog][identifier]}.syslog.log"
-			   codec => line { format => "[%{@timestamp}] %{message}"}
-		   }
-	   } else if [systemd][unit] =~ /^session-\d+.scope/ {
-		   file {
-			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/session.x.scope.log"
-			   codec => line { format => "[%{@timestamp}] %{[systemd][unit]}: %{message}"}
-		   }
-	   } else if [systemd][unit] =~ /^user.\d+.service/ {
-		   file {
-			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/user@x.service.log"
-			   codec => line { format => "[%{@timestamp}] %{[systemd][unit]}: %{message}"}
-		   }
-	   } else {
-		   file {
-			   path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[systemd][unit]}.log"
-			   codec => line { format => "[%{@timestamp}] %{[syslog][identifier]}: %{message}"}
-		   }
-	   }
+		    # No Unit name but syslog identifier is present
+		    file {
+			    path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[syslog][identifier]}.syslog.log"
+			    codec => line { format => "[%{@timestamp}] %{message}"}
+		    }
+	    } else if [systemd][unit] =~ /^session-\d+.scope/ {
+	        # No correct unit name but a spam of session-1234.scope
+		    file {
+		 	    path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/session.x.scope.log"
+		 	    codec => line { format => "[%{@timestamp}] %{[systemd][unit]}: %{message}"}
+		    }
+	    } else if [systemd][unit] =~ /^user.\d+.service/ {
+	        # No correct unit name but a spam of user@1234.service
+	 	    file {
+	 	        path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/user@x.service.log"
+	 		    codec => line { format => "[%{@timestamp}] %{[systemd][unit]}: %{message}"}
+	 	    }
+	    } else {
+	        # A propper Unit name is found
+	 	    file {
+	 		    path => "/data/logs/%{+YYYY.MM.dd}/nodes/%{[host][name]}/%{[systemd][unit]}.log"
+	 		    codec => line { format => "[%{@timestamp}] %{[syslog][identifier]}: %{message}"}
+	 	    }
+	    }
 	}
 }

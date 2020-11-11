@@ -1,9 +1,14 @@
 filter {
+    # copy swarm service name to tag field
     if [container][labels][com_docker_swarm_service_name] {
         mutate {
             copy => { "[container][labels][com_docker_swarm_service_name]" => "tag" }
         }
-        # Remove unused fields
+    }
+
+    # Remove unused fields
+    # container.labels.org_label-*
+    if [container][labels] {
         ruby {
             code => "
                 hash = event.get('[container][labels]')
@@ -15,6 +20,35 @@ filter {
                   end
                 end
             "
+        }
+    }
+
+    # parse json message when possible
+    # but skip TNT events
+    if [message] =~ "\A\{.+\}\z" and ! [message][event][transactionId] {
+        json {
+            # put result into the json field
+            skip_on_invalid_json => true
+            source => "message"
+            target => "json"
+
+            ###
+            # TODO:
+            # add support for [] in json messages
+            # https://github.com/elastic/logstash/issues/11608
+            ###
+
+        }
+        if [container][labels][com_docker_swarm_service_name] and "_jsonparsefailure" not in [tags] {
+            # put result into the field named after a service name
+            mutate {
+                rename => { "json" => "%{[container][labels][com_docker_swarm_service_name]}" }
+            }
+        } else if [container][name] and "_jsonparsefailure" not in [tags] {
+            # put result into the field named after a container name
+            mutate {
+                rename => { "json" => "%{[container][name]}" }
+            }
         }
     }
 }
