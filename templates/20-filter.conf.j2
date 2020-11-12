@@ -7,14 +7,14 @@ filter {
     }
 
     # Remove unused fields
-    # container.labels.org_label-*
+    # container.labels.org_label-* and container.labels.com_docker_swarm_*
     if [container][labels] {
         ruby {
             code => "
                 hash = event.get('[container][labels]')
                 hash.keys.each do |field|
                   # logger.info('field is:', field)
-                  if field.start_with?('org_label-')
+                  if field.start_with?('org_label-','com_docker_swarm_')
                     # must build full path to field
                     event.remove('[container][labels][' + field + ']')
                   end
@@ -25,7 +25,7 @@ filter {
 
     # parse json message when possible
     # but skip TNT events
-    if [message] =~ "\A\{.+\}\z" and ! [message][event][transactionId] {
+    if [message] =~ "\A\{.+\}\z" {
         json {
             # put result into the json field
             skip_on_invalid_json => true
@@ -39,15 +39,67 @@ filter {
             ###
 
         }
-        if [container][labels][com_docker_swarm_service_name] and "_jsonparsefailure" not in [tags] {
-            # put result into the field named after a service name
+        if "_jsonparsefailure" not in [tags] and ! [json][message][event][transactionId] {
             mutate {
-                rename => { "json" => "%{[container][labels][com_docker_swarm_service_name]}" }
+                remove_field => ["message"]
             }
-        } else if [container][name] and "_jsonparsefailure" not in [tags] {
-            # put result into the field named after a container name
+            if [json][userId] {
+                mutate {
+                    add_field => {"userId" => "%{[json][userId]}"}
+                    remove_field => ["[json][userId]"]
+                }
+            }
+            if [json][correlationId] {
+                mutate {
+                    add_field => {"correlationId" => "%{[json][correlationId]}"}
+                    remove_field => ["[json][correlationId]"]
+                }
+            }
+            if [json][method] {
+                mutate {
+                    add_field => {"[request][method]" => "%{[json][method]}"}
+                    remove_field => ["[json][method]"]
+                }
+            }
+            if [json][requestUri] {
+                mutate {
+                    add_field => {"[request][uri]" => "%{[json][requestUri]}"}
+                    remove_field => ["[json][requestUri]"]
+                }
+            }
+            if [json][serviceName] and [json][serviceName] != [tag] {
+                mutate {
+                    add_field => {"serviceName" => "%{[json][serviceName]}"}
+                    remove_field => ["[json][serviceName]"]
+                }
+            }
+            if [json][serviceInstanceId] {
+                mutate {
+                    add_field => {"serviceInstanceId" => "%{[json][serviceInstanceId]}"}
+                    remove_field => ["[json][serviceInstanceId]"]
+                }
+            }
+            if [json][message] {
+                mutate {
+                    add_field => {"message" => "%{[json][message]}"}
+                    remove_field => ["[json][message]"]
+                }
+            }
             mutate {
-                rename => { "json" => "%{[container][name]}" }
+                add_field => {"dataType" => "json"}
+                rename => { "requestdata" => "request" }
+                remove_field => ["json"]
+            }
+            if [tag] and "_jsonparsefailure" not in [tags] {
+                # put result into the field named after a service name
+                mutate {
+                    rename => { "json" => "%{[tag]}" }
+                }
+            } else if [container][name] and "_jsonparsefailure" not in [tags] {
+                # put result into the field named after a container name
+                mutate {
+                    rename => { "json" => "%{[container][name]}" }
+                }
             }
         }
     }

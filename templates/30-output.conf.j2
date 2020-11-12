@@ -5,14 +5,14 @@ output {
         gelf {
             host => "udp://logstash:12201"
         }
-    } else if [container][labels][com_docker_swarm_service_name] {
+    } else if [tag] {
         # Service
         elasticsearch {
             hosts => {{ logstash_elasticsearch_hosts | to_json }}
             index => "services-%{+YYYY.MM.dd}"
         }
 		file {
-			path => "/data/logs/%{+YYYY.MM.dd}/services/%{[container][labels][com_docker_swarm_service_name]}.log"
+			path => "/data/logs/%{+YYYY.MM.dd}/services/%{[tag]}.log"
 			codec => line { format => "[%{@timestamp}] %{[container][name]} @%{[host][name]}: %{message}" }
 		}
     } else if [container] {
