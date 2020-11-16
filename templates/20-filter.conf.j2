@@ -24,81 +24,217 @@ filter {
     }
 
     # parse json message when possible
-    # but skip TNT events
     if [message] =~ "\A\{.+\}\z" {
-        json {
-            # put result into the json field
-            skip_on_invalid_json => true
-            source => "message"
-            target => "json"
+        if [tag] == "kong" {
 
             ###
             # TODO:
-            # add support for [] in json messages
+            # remove this hack when the issue will be resolved
             # https://github.com/elastic/logstash/issues/11608
             ###
 
+            ruby {
+                code => "
+                def sanitize_field_reference(item)
+                    case item
+                        when Hash
+                            item.keys.each{ |k| item[k.gsub(/[\[\]]+/, '_')] = sanitize_field_reference(item.delete(k)) }
+                            return item
+                        when Array
+                            return item.map { |e| sanitize_field_reference(e) }
+                        else
+                            return item
+                    end
+                end
+                event.set('json', sanitize_field_reference(JSON.parse(event.get('message'))))
+                "
+            }
+        } else {
+            json {
+                # put result into the json field
+                skip_on_invalid_json => true
+                source => "message"
+                target => "json"
+            }
         }
-        if "_jsonparsefailure" not in [tags] and ! [json][message][event][transactionId] {
-            mutate {
-                remove_field => ["message"]
-            }
-            if [json][userId] {
+        if "_jsonparsefailure" not in [tags] {
+            if [json][event][transactionId] {
+                # Skip TNT
                 mutate {
-                    add_field => {"userId" => "%{[json][userId]}"}
-                    remove_field => ["[json][userId]"]
+                    add_field => { "[@metadata][output]" => "tnt" }
+                    remove_field => ["json"]
                 }
-            }
-            if [json][correlationId] {
-                mutate {
-                    add_field => {"correlationId" => "%{[json][correlationId]}"}
-                    remove_field => ["[json][correlationId]"]
+            } else if [tag] == "kong" and [json][api][upstream_url] {
+                #
+                # Kong HTTP logs
+                #
+                if ([json][request][headers][x-user-id]) {
+                    mutate {
+                        add_field => {
+                            "userId" => "%{[json][request][headers][x-user-id]}"
+                        }
+                    }
                 }
-            }
-            if [json][method] {
-                mutate {
-                    add_field => {"[request][method]" => "%{[json][method]}"}
-                    remove_field => ["[json][method]"]
+                if ([json][request][headers][x-user-roles]) {
+                    mutate {
+                        add_field => {
+                            "userRoles" => "%{[json][request][headers][x-user-roles]}"
+                        }
+                    }
                 }
-            }
-            if [json][requestUri] {
-                mutate {
-                    add_field => {"[request][uri]" => "%{[json][requestUri]}"}
-                    remove_field => ["[json][requestUri]"]
+                if ([json][latencies]) {
+                    mutate {
+                        add_field => {
+                            "[latency][request]" => "%{[json][latencies][request]}"
+                        }
+                        add_field => {
+                            "[latency][kong]" => "%{[json][latencies][kong]}"
+                        }
+                        add_field => {
+                            "[latency][service]" => "%{[json][latencies][proxy]}"
+                        }
+                    }
+                } else {
+                    mutate {
+                        add_field => {
+                            "[latency][request]" => 0
+                        }
+                        add_field => {
+                            "[latency][kong]" => 0
+                        }
+                        add_field => {
+                            "[latency][service]" => 0
+                        }
+                    }
                 }
-            }
-            if [json][serviceName] and [json][serviceName] != [tag] {
                 mutate {
-                    add_field => {"serviceName" => "%{[json][serviceName]}"}
-                    remove_field => ["[json][serviceName]"]
+                    #identity
+                    add_field => { "[correlationId]" => "%{[json][request][headers][correlation-id]}" }
+
+                    # host identity
+                    add_field => { "[hostIdentity][clientIp]" => "%{[json][client_ip]}" }
+                    add_field => { "[hostIdentity][userAgent]" => "%{[json][request][headers][user-agent]}" }
+
+                    #request
+                    add_field => { "[requestdata][kong][upstreamURL]" => "%{[json][api][upstream_url]}" }
+                    add_field => { "[requestdata][kong][uris]" => "%{[json][api][uris]}" }
+                    add_field => { "[requestdata][requestMethod]" => "%{[json][request][method]}" }
+                    add_field => { "[requestdata][requestUri]" => "%{[json][request][request_uri]}" }
+                    add_field => { "[requestdata][queryString]" => "%{[json][request][querystring]}" }
+                    add_field => { "[requestdata][cookie]" => "%{[json][request][headers][cookie]}" }
+                    add_field => { "[requestdata][started_at]" => "%{[json][started_at]}" }
+
+                    #response
+                    add_field => { "[responsedata][status]" => "%{[json][response][status]}" }
+
+
                 }
-            }
-            if [json][serviceInstanceId] {
                 mutate {
-                    add_field => {"serviceInstanceId" => "%{[json][serviceInstanceId]}"}
-                    remove_field => ["[json][serviceInstanceId]"]
+                    convert => {"[responsedata][status]" => "integer"}
+                    convert => {"[latency][request]" => "integer"}
+                    convert => {"[latency][service]" => "integer"}
+                    convert => {"[latency][kong]" => "integer"}
+                    convert => {"[requestdata][started_at]" => "integer"}
                 }
-            }
-            if [json][message] {
-                mutate {
-                    add_field => {"message" => "%{[json][message]}"}
-                    remove_field => ["[json][message]"]
+                prune {
+                    #whitelist only these items
+                    whitelist_names => ["responsedata", "requestdata", "correlationId", "@timestamp", "host", "hostIdentity", "level", "image_name", "userId", "userRoles", "latency", "tag"]
                 }
-            }
-            mutate {
-                add_field => {"dataType" => "json"}
-                rename => { "requestdata" => "request" }
-                remove_field => ["json"]
-            }
-            if [tag] and "_jsonparsefailure" not in [tags] {
-                # put result into the field named after a service name
-                mutate {
-                    rename => { "json" => "%{[tag]}" }
+                ruby {
+                  code => "event.set('[latency][total]', event.get('[latency][request]') + event.get('[latency][kong]') + event.get('[latency][service]'))"
+                    # code => "event.cancel if rand <= 0.90"
                 }
-            } else if [container][name] and "_jsonparsefailure" not in [tags] {
-                # put result into the field named after a container name
                 mutate {
-                    rename => { "json" => "%{[container][name]}" }
+                    #rename them back to the original object name
+                    rename => { "requestdata" => "request" }
+                    rename => { "responsedata" => "response" }
+                    add_field => {"dataType" => "json"}
+                    #message
+                    add_field => { "[message]" => "%{[request][requestUri]} - %{[response][status]}, %{[latency][total]}" }
+                }
+            } else {
+                #
+                # Not Kong json logs
+                #
+                mutate {
+                    remove_field => ["message"]
+                    add_field => {"dataType" => "json"}
+                }
+                if [json][userId] {
+                    mutate {
+                        add_field => {"userId" => "%{[json][userId]}"}
+                        remove_field => ["[json][userId]"]
+                    }
+                } else {
+                    mutate {
+                        remove_field => ["[json][userId]"]
+                    }
+                }
+                if [json][correlationId] {
+                    mutate {
+                        add_field => {"correlationId" => "%{[json][correlationId]}"}
+                        remove_field => ["[json][correlationId]"]
+                    }
+                } else {
+                    mutate {
+                        remove_field => ["[json][correlationId]"]
+                    }
+                }
+                if [json][method] {
+                    mutate {
+                        add_field => {"[request][method]" => "%{[json][method]}"}
+                        remove_field => ["[json][method]"]
+                    }
+                }
+                if [json][requestUri] {
+                    mutate {
+                        add_field => {"[request][uri]" => "%{[json][requestUri]}"}
+                        remove_field => ["[json][requestUri]"]
+                    }
+                }
+                if [json][timestamp] {
+                    date {
+                        match => [ "[json][timestamp]", "ISO8601" ]
+                    }
+                    mutate {
+                        remove_field => ["[json][timestamp]"]
+                    }
+                }
+                if [json][level] {
+                    mutate {
+                        add_field => {"level" => "%{[json][level]}"}
+                        remove_field => ["[json][level]"]
+                    }
+                }
+                if [json][serviceName] {
+                    if [json][serviceName] != [tag] {
+                        mutate {
+                            rename => {"tag" => "serviceName"}
+                        }
+                        mutate {
+                            copy => {"[json][serviceName]" => "tag"}
+                        }
+                    }
+                    mutate {
+                        remove_field => ["[json][serviceName]"]
+                    }
+                }
+                if [json][message] {
+                    mutate {
+                        add_field => {"message" => "%{[json][message]}"}
+                        remove_field => ["[json][message]"]
+                    }
+                }
+                if [tag] and "_jsonparsefailure" not in [tags] {
+                    # put result into the field named after a service name
+                    mutate {
+                        rename => { "json" => "%{[tag]}" }
+                    }
+                } else if [container][name] and "_jsonparsefailure" not in [tags] {
+                    # put result into the field named after a container name
+                    mutate {
+                        rename => { "json" => "%{[container][name]}" }
+                    }
                 }
             }
         }

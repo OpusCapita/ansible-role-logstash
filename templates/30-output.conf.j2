@@ -1,6 +1,6 @@
 output {
 
-    if [message][event][transactionId] {
+    if [@metadata][output] == "tnt" {
         # TNT
         gelf {
             host => "udp://logstash:12201"
@@ -21,11 +21,11 @@ output {
             # Container which still exists
             elasticsearch {
                 hosts => {{ logstash_elasticsearch_hosts | to_json }}
-                index => "container-%{+YYYY.MM.dd}"
+                index => "containers-%{+YYYY.MM.dd}"
             }
             file {
                 path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}/%{[host][name]}.log"
-                codec => line { format => "%{message}"}
+                codec => line { format => " @%{host}: %{message}"}
             }
 		}
 	} else if [@metadata][beat] {
