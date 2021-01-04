@@ -138,7 +138,7 @@ filter {
                 }
                 prune {
                     #whitelist only these items
-                    whitelist_names => ["responsedata", "requestdata", "correlationId", "@timestamp", "host", "hostIdentity", "level", "image_name", "userId", "userRoles", "latency", "tag"]
+                    whitelist_names => ["responsedata", "requestdata", "correlationId", "@timestamp", "host", "hostIdentity", "level", "image_name", "userId", "userRoles", "latency", "tag", "container", "input", "log", "stream"]
                 }
                 ruby {
                   code => "event.set('[latency][total]', event.get('[latency][request]') + event.get('[latency][kong]') + event.get('[latency][service]'))"

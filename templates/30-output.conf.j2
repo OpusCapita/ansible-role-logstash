@@ -24,8 +24,8 @@ output {
                 index => "containers-%{+YYYY.MM.dd}"
             }
             file {
-                path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}/%{[host][name]}.log"
-                codec => line { format => " @%{host}: %{message}"}
+                path => "/data/logs/%{+YYYY.MM.dd}/containers/%{[container][name]}.log"
+                codec => line { format => "[%{@timestamp}] @%{[host][name]}: %{message}"}
             }
 		}
 	} else if [@metadata][beat] {
