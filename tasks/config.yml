@@ -33,6 +33,20 @@
   with_dict: "{{ logstash_log4j2_properties }}"
   notify: restart logstash
 
+- name: 'JVM xms'
+  lineinfile:
+    line: "-Xms{{ logstash_mem }}"
+    path: '/etc/logstash/jvm.options'
+    regexp: '-Xms'
+  notify: restart logstash
+
+- name: 'JVM xmx'
+  lineinfile:
+    line: "-Xmx{{ logstash_mem }}"
+    path: '/etc/logstash/jvm.options'
+    regexp: '-Xmx'
+  notify: restart logstash
+
 - name: Create Logstash systemd service.
   template:
     src: "logstash.service.j2"
