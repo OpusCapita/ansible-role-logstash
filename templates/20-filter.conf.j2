@@ -6,6 +6,11 @@ filter {
         }
     }
 
+    if [tag] == "logstash" {
+        # Old logstash service produces a lot of garbage logs
+        drop { }
+    }
+
     # Remove unused fields
     # container.labels.org_label-* and container.labels.com_docker_swarm_*
     if [container][labels] {
