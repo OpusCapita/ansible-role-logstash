@@ -211,19 +211,19 @@ filter {
                         remove_field => ["[json][level]"]
                     }
                 }
-                if [json][serviceName] {
-                    if [json][serviceName] != [tag] {
-                        mutate {
-                            rename => {"tag" => "serviceName"}
-                        }
-                        mutate {
-                            copy => {"[json][serviceName]" => "tag"}
-                        }
-                    }
-                    mutate {
-                        remove_field => ["[json][serviceName]"]
-                    }
-                }
+                # if [json][serviceName] {
+                #     if [json][serviceName] != [tag] {
+                #         mutate {
+                #             rename => {"tag" => "serviceName"}
+                #         }
+                #         mutate {
+                #             copy => {"[json][serviceName]" => "tag"}
+                #         }
+                #     }
+                #     mutate {
+                #         remove_field => ["[json][serviceName]"]
+                #     }
+                # }
                 if [json][message] {
                     mutate {
                         add_field => {"message" => "%{[json][message]}"}
