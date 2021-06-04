@@ -230,6 +230,7 @@ filter {
                         remove_field => ["[json][message]"]
                     }
                 }
+
                 if [tag] and "_jsonparsefailure" not in [tags] {
                     # put result into the field named after a service name
                     mutate {
@@ -243,5 +244,11 @@ filter {
                 }
             }
         }
+    }
+    # truncate big fields in events
+    # need the logstash-filter-truncate plugin
+    truncate {
+        length_bytes => "102400"
+        fields => [ "message" ]
     }
 }
