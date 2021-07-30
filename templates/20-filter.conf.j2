@@ -5,6 +5,12 @@ filter {
             copy => { "[container][labels][com_docker_swarm_service_name]" => "tag" }
         }
     }
+    # copy kubernetes label app to tag field
+    if [kubernetes][labels][app] {
+        mutate {
+            copy => { "[kubernetes][labels][app]" => "tag" }
+        }
+    }
 
     if [tag] == "logstash" {
         # Old logstash service produces a lot of garbage logs
