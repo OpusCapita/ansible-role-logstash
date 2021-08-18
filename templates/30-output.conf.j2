@@ -15,6 +15,27 @@ output {
 			path => "/data/logs/%{+YYYY.MM.dd}/services/%{[tag]}.log"
 			codec => line { format => "[%{@timestamp}] %{[container][name]} @%{[host][name]}: %{message}" }
 		}
+    } else if [kubernetes] {
+        # kubernetes container
+        if [kubernetes][labels][app_kubernetes_io/name] == 'ingress-nginx' and [json][httpRequest] {
+            elasticsearch {
+                hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                index => "ingress-%{+YYYY.MM.dd}"
+            }
+            file {
+                path => "/data/logs/%{+YYYY.MM.dd}/kubernetes/%{[kubernetes][namespace]}/%{[kubernetes][pod][name]}.log"
+                codec => line { format => "[%{@timestamp}] %{[kubernetes][container][name]}: %{[json][httpRequest][remoteIp]} %{[json][httpRequest][requestMethod]} %{[json][httpRequest][status]} %{[json][httpRequest][requestUrl]} %{[json][httpRequest][responseSize]}b %{[json][httpRequest][latency]} %{[json][upstreamAddr]}"}
+            }
+        } else {
+            elasticsearch {
+                hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                index => "aks-%{+YYYY.MM.dd}"
+            }
+            file {
+                path => "/data/logs/%{+YYYY.MM.dd}/kubernetes/%{[kubernetes][namespace]}/%{[kubernetes][pod][name]}.log"
+                codec => line { format => "[%{@timestamp}] %{[kubernetes][container][name]}: %{message}"}
+            }
+        }
     } else if [container] {
         # docker container
         if [container][name] {

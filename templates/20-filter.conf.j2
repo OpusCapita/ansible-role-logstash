@@ -1,4 +1,8 @@
 filter {
+    # Avoid getting random logs into services index
+    mutate {
+        remove_field => ["tag"]
+    }
     # copy swarm service name to tag field
     if [container][labels][com_docker_swarm_service_name] {
         mutate {
@@ -6,9 +10,9 @@ filter {
         }
     }
     # copy kubernetes label app to tag field
-    if [kubernetes][labels][app] {
+    if [kubernetes][labels][tag] {
         mutate {
-            copy => { "[kubernetes][labels][app]" => "tag" }
+            copy => { "[kubernetes][labels][tag]" => "tag" }
         }
     }
 
