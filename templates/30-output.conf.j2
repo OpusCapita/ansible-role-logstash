@@ -5,19 +5,19 @@ output {
         gelf {
             host => "udp://logstash:12201"
         }
-    } else if [tag] {
-        # Service
-        elasticsearch {
-            hosts => {{ logstash_elasticsearch_hosts | to_json }}
-            index => "services-%{+YYYY.MM.dd}"
-        }
-		file {
-			path => "/data/logs/%{+YYYY.MM.dd}/services/%{[tag]}.log"
-			codec => line { format => "[%{@timestamp}] %{[container][name]} @%{[host][name]}: %{message}" }
-		}
     } else if [kubernetes] {
         # kubernetes container
-        if [kubernetes][labels][app_kubernetes_io/name] == 'ingress-nginx' and [json][httpRequest] {
+        if [tag] {
+             # Service
+             elasticsearch {
+                 hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                 index => "services-%{+YYYY.MM.dd}"
+             }
+            file {
+                path => "/data/logs/%{+YYYY.MM.dd}/services/%{[tag]}.log"
+                codec => line { format => "[%{@timestamp}] %{[kubernetes][pod][name]} (%{[kubernetes][pod][ip]}) @%{[kubernetes][node][name]}: %{message}" }
+            }
+        } else if [kubernetes][labels][app_kubernetes_io/name] == 'ingress-nginx' and [json][httpRequest] {
             elasticsearch {
                 hosts => {{ logstash_elasticsearch_hosts | to_json }}
                 index => "ingress-%{+YYYY.MM.dd}"
@@ -35,6 +35,16 @@ output {
                 path => "/data/logs/%{+YYYY.MM.dd}/kubernetes/%{[kubernetes][namespace]}/%{[kubernetes][pod][name]}.log"
                 codec => line { format => "[%{@timestamp}] %{[kubernetes][container][name]}: %{message}"}
             }
+        }
+    } else if [tag] {
+         # Service
+         elasticsearch {
+             hosts => {{ logstash_elasticsearch_hosts | to_json }}
+             index => "services-%{+YYYY.MM.dd}"
+         }
+        file {
+            path => "/data/logs/%{+YYYY.MM.dd}/services/%{[tag]}.log"
+            codec => line { format => "[%{@timestamp}] %{[container][name]} @%{[host][name]}: %{message}" }
         }
     } else if [container] {
         # docker container
