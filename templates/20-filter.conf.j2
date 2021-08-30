@@ -1,4 +1,10 @@
 filter {
+    # truncate big fields in events
+    # need the logstash-filter-truncate plugin
+    truncate {
+        length_bytes => "102400"
+        fields => [ "message" ]
+    }
     # Avoid getting random logs into services index
     mutate {
         remove_field => ["tag"]
@@ -254,11 +260,5 @@ filter {
                 }
             }
         }
-    }
-    # truncate big fields in events
-    # need the logstash-filter-truncate plugin
-    truncate {
-        length_bytes => "102400"
-        fields => [ "message" ]
     }
 }
