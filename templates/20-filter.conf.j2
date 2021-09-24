@@ -5,6 +5,15 @@ filter {
         length_bytes => "102400"
         fields => [ "message" ]
     }
+
+    # Filter docker crap
+    # run-docker-runtime\x2drunc-moby-df7242b221e2a4ac7a0120e6cd77a3a2d886be917917ff2229b7f6dbd32e5e25-runc.NJFg1X.mount: Succeeded.
+    if [agent][type] == "journalbeat" {
+        if [message] =~ "\Arun-docker-runtime.*\.mount: Succeeded\.\z" {
+            drop { }
+        }
+    }
+
     # Avoid getting random logs into services index
     mutate {
         remove_field => ["tag"]
