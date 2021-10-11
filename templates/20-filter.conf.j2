@@ -55,38 +55,40 @@ filter {
 
     # parse json message when possible
     if [message] =~ "\A\{.+\}\z" {
-        if [tag] == "kong" {
 
-            ###
-            # TODO:
-            # remove this hack when the issue will be resolved
-            # https://github.com/elastic/logstash/issues/11608
-            ###
+        ###
+        # TODO:
+        # remove this hack when the issue will be resolved
+        # https://github.com/elastic/logstash/issues/11608
+        # If it is not resolved for long time then maybe try this plugin
+        # https://github.com/OpenSource-THG/logstash-filter-json/blob/master/lib/logstash/filters/thgjson.rb
+        # or use standard parsing when issue is resolved:
+        #
+        # json {
+        #     # put result into the json field
+        #     skip_on_invalid_json => true
+        #     source => "message"
+        #     target => "json"
+        # }
+        ###
 
-            ruby {
-                code => "
-                def sanitize_field_reference(item)
-                    case item
-                        when Hash
-                            item.keys.each{ |k| item[k.gsub(/[\[\]]+/, '_')] = sanitize_field_reference(item.delete(k)) }
-                            return item
-                        when Array
-                            return item.map { |e| sanitize_field_reference(e) }
-                        else
-                            return item
-                    end
+        ruby {
+            code => "
+            def sanitize_field_reference(item)
+                case item
+                    when Hash
+                        item.keys.each{ |k| item[k.gsub(/[\[\]]+/, '_')] = sanitize_field_reference(item.delete(k)) }
+                        return item
+                    when Array
+                        return item.map { |e| sanitize_field_reference(e) }
+                    else
+                        return item
                 end
-                event.set('json', sanitize_field_reference(JSON.parse(event.get('message'))))
-                "
-            }
-        } else {
-            json {
-                # put result into the json field
-                skip_on_invalid_json => true
-                source => "message"
-                target => "json"
-            }
+            end
+            event.set('json', sanitize_field_reference(JSON.parse(event.get('message'))))
+            "
         }
+
         if "_jsonparsefailure" not in [tags] {
             if [json][event][transactionId] {
                 # Skip TNT
