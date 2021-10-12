@@ -57,36 +57,36 @@ filter {
     if [message] =~ "\A\{.+\}\z" {
 
         ###
-        # TODO:
-        # remove this hack when the issue will be resolved
+        # WORKAROUND FOR logstash ver >= 7.x
         # https://github.com/elastic/logstash/issues/11608
         # If it is not resolved for long time then maybe try this plugin
         # https://github.com/OpenSource-THG/logstash-filter-json/blob/master/lib/logstash/filters/thgjson.rb
-        # or use standard parsing when issue is resolved:
-        #
-        # json {
-        #     # put result into the json field
-        #     skip_on_invalid_json => true
-        #     source => "message"
-        #     target => "json"
-        # }
-        ###
+        # & https://github.com/cameronkerrnz/logstash-plugin-dev/
+        # & https://github.com/OpusCapita/logstash-filter-json
+        # Also this drop in ruby filter gets the job done but it is very slow:
+        #        ruby {
+        #            code => "
+        #            def sanitize_field_reference(item)
+        #                case item
+        #                    when Hash
+        #                        item.keys.each{ |k| item[k.gsub(/[\[\]]+/, '_')] = sanitize_field_reference(item.delete(k)) }
+        #                        return item
+        #                    when Array
+        #                        return item.map { |e| sanitize_field_reference(e) }
+        #                    else
+        #                        return item
+        #                end
+        #            end
+        #            event.set('json', sanitize_field_reference(JSON.parse(event.get('message'))))
+        #            "
+        #        }
 
-        ruby {
-            code => "
-            def sanitize_field_reference(item)
-                case item
-                    when Hash
-                        item.keys.each{ |k| item[k.gsub(/[\[\]]+/, '_')] = sanitize_field_reference(item.delete(k)) }
-                        return item
-                    when Array
-                        return item.map { |e| sanitize_field_reference(e) }
-                    else
-                        return item
-                end
-            end
-            event.set('json', sanitize_field_reference(JSON.parse(event.get('message'))))
-            "
+        # While we are on version 6.x we can use this:
+        json {
+            # put result into the json field
+            skip_on_invalid_json => true
+            source => "message"
+            target => "json"
         }
 
         if "_jsonparsefailure" not in [tags] {
