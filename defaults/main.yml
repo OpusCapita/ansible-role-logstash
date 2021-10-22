@@ -1,5 +1,8 @@
 ---
-logstash_version: '7.x'
+logstash_version_repo: '7.x'
+logstash_apt_package_version: ""
+logstash_apt_package_name: logstash
+logstash_apt_package: '{% if logstash_apt_package_version | length > 0 %}{{ logstash_apt_package_name }}={{ logstash_apt_package_version }}{% else %}{{ logstash_apt_package_name }}{% endif %}'
 
 logstash_listen_port_beats: 5044
 

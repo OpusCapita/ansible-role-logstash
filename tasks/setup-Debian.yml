@@ -13,13 +13,13 @@
 
 - name: Add Logstash repository.
   apt_repository:
-    repo: 'deb https://artifacts.elastic.co/packages/{{ logstash_version }}/apt stable main'
+    repo: 'deb https://artifacts.elastic.co/packages/{{ logstash_version_repo }}/apt stable main'
     state: present
     update_cache: true
 
 - name: Install Logstash.
   apt:
-    name: logstash
+    name: "{{ logstash_apt_package }}"
     state: present
 
 - name: Add Logstash user to adm group (Debian).

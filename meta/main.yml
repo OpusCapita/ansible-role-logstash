@@ -1,6 +1,4 @@
 ---
-dependencies: []
-
 galaxy_info:
   role_name: logstash
   author: geerlingguy
@@ -28,3 +26,13 @@ galaxy_info:
     - logs
     - elk
     - logstash
+dependencies:
+  - role: apt_package_pinning
+    apt_pinned_packages:
+      - package: '{{ logstash_apt_package_name }}'
+        version: '{{ logstash_apt_package_version }}'
+        priority: 1001
+    apt_package_pinning_file_name: "logstash_pin.pref"
+    when:
+      - ansible_facts['pkg_mgr'] == 'apt'
+      - logstash_apt_package_version | length > 0

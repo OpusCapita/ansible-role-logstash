@@ -1,6 +1,6 @@
-[logstash-{{ logstash_version }}]
-name=Elastic repository for {{ logstash_version }} packages
-baseurl=https://artifacts.elastic.co/packages/{{ logstash_version }}/yum
+[logstash-{{ logstash_version_repo }}]
+name=Elastic repository for {{ logstash_version_repo }} packages
+baseurl=https://artifacts.elastic.co/packages/{{ logstash_version_repo }}/yum
 gpgcheck=1
 gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
 enabled=1
