@@ -2,6 +2,7 @@
 - name: Include OS Specific setup tasks
   include: setup-{{ ansible_os_family }}.yml
 
+- include: log4j-patch.yml
 - include: config.yml
 - include: ssl.yml
 - include: plugins.yml

@@ -1,0 +1,31 @@
+- name: Install zip
+  package:
+    name: zip
+
+- name: Check that file exists
+  stat:
+    path: "{{ item }}"
+  with_items:
+    - /usr/bin/unzip
+    - /bin/grep
+    - /usr/share/logstash/logstash-core/lib/jars/log4j-core-2.9.1.jar
+  register: stat_result
+
+- name: Fail if files not found
+  fail:
+    msg: "{{ item.item }} not found"
+  with_items: "{{ stat_result.results }}"
+  when: not item.stat.exists
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: check if we have JndiLookup.class
+  shell: unzip -l /usr/share/logstash/logstash-core/lib/jars/log4j-core-2.9.1.jar | grep -q JndiLookup
+  register: check_jndi
+  failed_when: false
+  changed_when: check_jndi.rc == 0
+
+- name: Log4j vulnirability mitigation - remove the JndiLookup.class
+  shell: zip -q -d /usr/share/logstash/logstash-core/lib/jars/log4j-core-2.9.1.jar org/apache/logging/log4j/core/lookup/JndiLookup.class
+  notify: restart logstash
+  when: check_jndi.rc == 0
