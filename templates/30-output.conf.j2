@@ -3,7 +3,7 @@ output {
     if [@metadata][output] == "tnt" {
         # TNT
         gelf {
-            host => "logstash"
+            host => "udp://logstash:12201"
             protocol => "TCP"
         }
     } else if [kubernetes] {
