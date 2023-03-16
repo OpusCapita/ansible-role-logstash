@@ -1,5 +1,12 @@
 output {
-    if [kubernetes] {
+    if [@metadata][output] == "tnt" {
+        # TNT
+        gelf {
+            host => "logstash.aks.{{ env }}.bnp.it.opuscapita.com"
+            port => "12201"
+            protocol => "TCP"
+        }
+    } else if [kubernetes] {
         # kubernetes container
         if [tag] {
              # Service
@@ -70,6 +77,11 @@ output {
                 hosts => {{ logstash_elasticsearch_hosts | to_json }}
                 index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
             }
+        }
+    } else if [@metadata][beat] == "journalbeat" {
+        elasticsearch {
+            hosts => {{ logstash_elasticsearch_hosts | to_json }}
+            index => "journalbeat-%{+YYYY.MM.dd}"
         }
     }
 
