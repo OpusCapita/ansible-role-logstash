@@ -257,17 +257,23 @@ filter {
                         remove_field => ["[json][message]"]
                     }
                 }
-
-                if [tag] and "_jsonparsefailure" not in [tags] {
-                    # put result into the field named after a service name
-                    mutate {
-                        rename => { "json" => "%{[tag]}" }
-                    }
-                } else if [container][name] and "_jsonparsefailure" not in [tags] {
-                    # put result into the field named after a container name
-                    mutate {
-                        rename => { "json" => "%{[container][name]}" }
-                    }
+            }
+            if [tag] {
+                # put result into the field named after a service name
+                mutate {
+                    rename => { "json" => "%{[tag]}" }
+                }
+            } else if [container][name] {
+                # put result into the field named after a container name (docker)
+                mutate {
+                    rename => { "json" => "%{[container][name]}" }
+                }
+            } else if [kubernetes][labels][app_kubernetes_io/name] == 'ingress-nginx' and [json][httpRequest] {
+                # skip renaming json field because it is required in output section to detect an ingress logs to put into separate index.
+            } else if [kubernetes][container][name] {
+                # put result into the field named after a container name (kubernetes)
+                mutate {
+                    rename => { "json" => "%{[kubernetes][namespace]}-%{[kubernetes][container][name]}" }
                 }
             }
         }
