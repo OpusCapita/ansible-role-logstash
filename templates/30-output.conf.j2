@@ -64,27 +64,42 @@ output {
                 codec => line { format => "[%{@timestamp}] @%{[host][name]}: %{message}"}
             }
 		    }
-	  } else if [@metadata][beat] == "filebeat" {
-        # System logs
-        # the value of [@metadata][beat] is journalbeat or filebeat
-        if [input][type] == "journald" {
-            elasticsearch {
-                hosts => {{ logstash_elasticsearch_hosts | to_json }}
-                index => "journalbeat-%{+YYYY.MM.dd}"
+    } else if [@metadata][beat] {
+        if [agent][type] == "journalbeat" or [input][type] == "journald" {
+            # Journalbeat or Filebeat with journald input
+            if [project] {
+                elasticsearch {
+                    hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                    index => "%{[project]}-journalbeat-%{+YYYY.MM.dd}"
+                }
+            } else {
+                elasticsearch {
+                    hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                    index => "journalbeat-%{+YYYY.MM.dd}"
+                }
             }
         } else {
-            elasticsearch {
-                hosts => {{ logstash_elasticsearch_hosts | to_json }}
-                index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+            # Filebeat
+            if [project] and [log_type] == "sag" {
+                # SAG logs go to project-logs index
+                elasticsearch {
+                    hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                    index => "%{[project]}-logs-%{+YYYY.MM.dd}"
+                }
+            } else if [project] {
+                # Other filebeat logs go to project-filebeat index
+                elasticsearch {
+                    hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                    index => "%{[project]}-filebeat-%{+YYYY.MM.dd}"
+                }
+            } else {
+                elasticsearch {
+                    hosts => {{ logstash_elasticsearch_hosts | to_json }}
+                    index => "filebeat-%{+YYYY.MM.dd}"
+                }
             }
         }
-    } else if [@metadata][beat] == "journalbeat" {
-        elasticsearch {
-            hosts => {{ logstash_elasticsearch_hosts | to_json }}
-            index => "journalbeat-%{+YYYY.MM.dd}"
-        }
     }
-
     if [input][type] == "log" {
         # Log files
         file {
